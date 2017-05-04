@@ -1,0 +1,20 @@
+- include: docker_common.yml
+
+## TODO
+## - set a fact if docker is installed
+## - if it is print it and skip all the activity in here
+
+- name: Set max install version on Amazon Linux
+  set_fact:
+    pinned_docker_version: 1.12.6
+
+#        # Docker install script no longer supports Amazon Linux
+#        printf "${GREEN}Installing docker from yum repository${NC}\n"
+#        yum -y -q install docker-${1}
+#        printf "${GREEN}External script is finished${NC}\n"
+#        service docker start || true
+#        DID_INSTALL_DOCKER=1
+#        return
+
+- debug:
+    msg: "Running the docker install using docker version {{ pinned_docker_version }} "

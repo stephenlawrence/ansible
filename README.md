@@ -6,8 +6,13 @@ This role helps install Replicated and provides install automation for applicati
 Requirements
 ------------
 
-This role requires Ansible 1.9 or higher. The platform platform requirements are found
-in the metadata file.
+This role requires Ansible 1.9 or higher. The platform platform requirements are found in the metadata file.
+
+Required playbooks are documented in `requirements.yml` and can be installed via
+
+```
+ansible-galaxy install -r /etc/ansible/roles/replicated.ansible/requirements.yml
+```
 
 Role Variables
 --------------

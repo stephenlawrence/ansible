@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+## TODO: new docker versions are not semver, write a function to make them compatible
+import semver
+import sys
+print semver.compare(sys.argv[1], sys.argv[2])

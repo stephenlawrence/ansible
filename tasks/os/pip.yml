@@ -1,0 +1,29 @@
+- name: Check for pip
+  stat:
+    path: /usr/local/bin/pip
+  register: pip_exists
+
+- name: Download pipe installer
+  command: >
+    curl -o /tmp/pip.py https://bootstrap.pypa.io/get-pip.py
+  when: not pip_exists
+
+- name: Install pip
+  become: yes
+  become_method: sudo
+  command: >
+    python /tmp/pip.py
+  when: not pip_exists
+
+- name: Install semver library
+  become: yes
+  become_method: sudo
+  command: >
+    pip install semver
+  when: not pip_exists
+
+- name: Create semver test
+  template:
+    src: ../templates/semver_check
+    dest: /tmp/semver_check
+    mode: 0755

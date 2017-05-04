@@ -1,4 +1,7 @@
 ---
+dependencies:
+  - { role: ansible-pip }
+
 galaxy_info:
   author: "Replicated"
   description: An Ansible role for installing Replicated
