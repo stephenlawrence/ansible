@@ -173,29 +173,39 @@
     airgap_envvar: ''
 
 ## TODO add notify restart
-- name: Copy Replicated config
+- name: Create Replicated defaults in {{ confdir }}/replicated
   template:
     src: replicated_conf.j2
     dest: "{{ confdir }}/replicated"
 
 ## TODO add notify restart
-- name: Copy Replicated init.d script
+- name: Create Replicated init file at /etc/init/replicated.conf
   template:
     src: replicated/upstart/replicated_service.j2
     dest: /etc/init/replicated.conf
   when: ansible_service_mgr == "upstart"
+  notify: Start replicated service
 
 ## TODO add notify restart
-- name: Copy Replicated UI init.d script
+- name: Create Replicated UI init file at /etc/init/replicated-ui.conf
   template:
     src: replicated/upstart/replicated_ui_service.j2
     dest: /etc/init/replicated-ui.conf
   when: ansible_service_mgr == "upstart"
+  notify: Start replicated-ui service
 
-#  notify: start tomcat service
+## TODO: do we need to stop replicated at the start of the install?
+- service:
+    name: replicated
+    state: started
 
-#handlers:
-# - name: start tomcat service
-#   service: name=my_service state=restarted
+- service:
+    name: replicated-ui
+    state: started
+
+## TODO: add sysv init scripts
+## TODO: add systemd init scripts
 
 ## TODO: install operator
+
+- include: replicated-operator.yml
