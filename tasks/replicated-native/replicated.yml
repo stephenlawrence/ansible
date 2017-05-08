@@ -1,0 +1,201 @@
+- name: Create Replicated User
+  user:
+    name: replicated
+    shell: /bin/bash
+    groups: docker
+    append: true
+
+- name: Create Replicated Alias
+  template:
+    src: ../templates/replicated.alias
+    dest: /etc/replicated.alias
+    mode: 0644
+
+- name: Add replicated alias to global bash.bashrc
+  blockinfile:
+    dest: /etc/bash.bashrc
+    insertafter: EOF
+    state: present
+    block: |
+      if [ -f /etc/replicated.alias ]; then
+          . /etc/replicated.alias
+      fi
+
+## TODO: add proxy support
+
+## TODO: add ipv6 support
+
+- debug:
+    msg: Installing Replicated {{ replicated_version }}
+
+- name: Download Replicated
+  command: docker pull "quay.io/replicated/replicated:{{ release_channel }}-{{ replicated_version }}"
+  become: yes
+  become_method: sudo
+  when: not skip_docker_install
+
+- name: Tag Replicated
+  command: docker tag "quay.io/replicated/replicated:{{ release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated:current"
+  become: yes
+  become_method: sudo
+  when: not skip_docker_install
+
+- name: Download Replicated UI
+  command: docker pull "quay.io/replicated/replicated-ui:{{ release_channel }}-{{ replicated_version }}"
+  become: yes
+  become_method: sudo
+  when: not skip_docker_install
+
+- name: Tag Replicated UI
+  command: docker tag "quay.io/replicated/replicated-ui:{{ release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated-ui:current"
+  become: yes
+  become_method: sudo
+  when: not skip_docker_install
+
+###
+### Discover the replicated user setup or create as needed
+###
+
+- name: Discover replicated user-uid
+  command: "id -u {{ replicated_username }}"
+  register: replicated_uid_cmd
+
+- name: Discover the docker group ID
+  command: "stat -c '%g' /var/run/docker.sock"
+  register: docker_gid_cmd
+
+- name: Fallback to the docker group if needed
+  command: "getent group docker | cut -d: -f3"
+  register: docker_gid_fallback_cmd
+  when: docker_gid_cmd is not defined
+
+- name: Set UID/GID vars
+  set_fact:
+    replicated_user_id: '{{ replicated_uid_cmd.stdout | default("0") }}'
+    docker_group_id: '{{ docker_gid_cmd.stdout | default(docker_gid_fallback_cmd.stdout) | default("0") }}'
+
+###
+### Set the directory where the configuration files will be saved
+### 
+- stat:
+    path: /etc/sysconfig
+  register: sysconfig_dir
+
+- name: Set confdir
+  set_fact:
+    confdir: "/etc/sysconfig"
+  when:
+  - ansible_service_mgr == "systemd"
+  - sysconfig_dir.stat.isDir is defined and sysconfig_dir.stat.isDir
+
+- name: Default confdir
+  set_fact:
+    confdir: "/etc/default"
+  when: confdir is not defined
+
+##
+## Discover the CA file and mount it into Replicated and thus allowing updates to the host CA file to be
+## reflected in the running Replicated (Replicated will need to be restarted after the change)
+##
+- name: Check for /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+  stat:
+    path: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+  register: ca1
+
+- name: Check for /etc/pki/tls/certs/ca-bundle.crt
+  stat:
+    path: /etc/pki/tls/certs/ca-bundle.crt
+  register: ca2
+
+- name: Check for /etc/ssl/ca-bundle.pem
+  stat:
+    path: /etc/ssl/ca-bundle.pem
+  register: ca3
+
+- name: Check for /etc/pki/tls/cacert.pem
+  stat:
+    path: /etc/pki/tls/cacert.pem
+  register: ca4
+
+- name: Check for /etc/ssl/certs/ca-certificates.crt
+  stat:
+    path: /etc/ssl/certs/ca-certificates.crt
+  register: ca5
+
+- debug:
+    msg: CA5 is {{ ca5 }}
+
+- name: Choose /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem if exists
+  set_fact: cert_file="/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+  when: ca1.stat.exists == True
+
+- name: Choose /etc/pki/tls/certs/ca-bundle.crt if exists
+  set_fact: cert_file="/etc/pki/tls/certs/ca-bundle.crt"
+  when: ca1.stat.exists == True
+
+- name: Choose /etc/ssl/ca-bundle.pem if exists
+  set_fact: cert_file="/etc/ssl/ca-bundle.pem"
+  when: ca1.stat.exists == True
+
+- name: Choose /etc/pki/tls/cacert.pem if exists
+  set_fact: cert_file="/etc/pki/tls/cacert.pem"
+  when: ca1.stat.exists == True
+
+- name: Choose /etc/ssl/certs/ca-certificates.crt if exists
+  set_fact: cert_file="/etc/ssl/certs/ca-certificates.crt"
+  when: ca5.stat.exists == True
+
+- name: Set the CA flag
+  set_fact: replicated_trusted_cert_mount="-v {{ cert_file }}:/etc/ssl/certs/ca-certificates.crt"
+  when: cert_file is defined
+
+- name: Skip the CA flag, no CA file found
+  set_fact: replicated_trusted_cert_mount=""
+  when: cert_file is not defined
+
+###
+### Set startup opts flags for REPLICATED and REPLICATED_UI
+###
+
+- name: Set the HTTP_PROXY flag
+  set_fact:
+    http_proxy_envvar: '-e HTTP_PROXY="{{ HTTP_PROXY }}"'
+  when: HTTP_PROXY is defined
+
+- name: Default to no HTTP_PROXY
+  set_fact:
+    http_proxy_envvar: ''
+  when: HTTP_PROXY is not defined
+
+- set_fact:
+    registry_advertise_address_envvar: ''
+    daemon_token_envvar: '-e DAEMON_TOKEN="{{ daemon_token }}"'
+    airgap_envvar: ''
+
+## TODO add notify restart
+- name: Copy Replicated config
+  template:
+    src: replicated_conf.j2
+    dest: "{{ confdir }}/replicated"
+
+## TODO add notify restart
+- name: Copy Replicated init.d script
+  template:
+    src: replicated/upstart/replicated_service.j2
+    dest: /etc/init/replicated.conf
+  when: ansible_service_mgr == "upstart"
+
+## TODO add notify restart
+- name: Copy Replicated UI init.d script
+  template:
+    src: replicated/upstart/replicated_ui_service.j2
+    dest: /etc/init/replicated-ui.conf
+  when: ansible_service_mgr == "upstart"
+
+#  notify: start tomcat service
+
+#handlers:
+# - name: start tomcat service
+#   service: name=my_service state=restarted
+
+## TODO: install operator

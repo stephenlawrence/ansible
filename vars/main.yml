@@ -5,3 +5,4 @@ replicated_version: 2.7.0
 release_channel: stable
 replicated_username: replicated
 ui_bind_port: 8800
+skip_docker_install: false

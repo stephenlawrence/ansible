@@ -84,6 +84,7 @@
     opt_docker_version: ''
   when: opt_docker_version is not defined
 
+## TODO: get the daemon token from the host, only if it doesn't exist recompute it
 - name: Get daemon token
   shell: |
     head -c 128 /dev/urandom | tr -dc "a-zA-Z0-9" | fold -w 32 | head -n 1
