@@ -84,25 +84,20 @@
     opt_docker_version: ''
   when: opt_docker_version is not defined
 
-- name: Set daemon token
+- name: Get daemon token
+  shell: |
+    head -c 128 /dev/urandom | tr -dc "a-zA-Z0-9" | fold -w 32 | head -n 1
+  register: daemon_token_cmd
+
+- name: Set daemon token from command
   set_fact:
-    opt_daemon_token: 'daemon-token={{ daemon_token }}'
-  when: daemon_token is defined
+    daemon_token: '{{ daemon_token_cmd.stdout }}'
+  when: daemon_token is not defined
 
 - name: Default daemon token if not passed
   set_fact:
     opt_daemon_token: ''
   when: daemon_token is not defined
-
-- name: Set daemon endpoint
-  set_fact:
-    opt_daemon_endpoint: 'daemon-endpoint={{ daemon_endpoint }}'
-  when: daemon_endpoint is defined
-
-- name: Default daemon endpoint
-  set_fact:
-    opt_daemon_endpoint: ''
-  when: daemon_endpoint is not defined
 
 - name: Set Replicated install url
   set_fact:
@@ -121,8 +116,7 @@
       Public address: {{ opt_public_address }}
       Proxy: {{ opt_proxy }}
       Docker version: {{ opt_docker_version }}
-      Daemon token: {{ opt_daemon_token }}
-      Daemon endpoint: {{ opt_daemon_endpoint }}
+      Daemon token: {{ daemon_token }}
 
 - name: Debug Variables
   debug:
@@ -143,9 +137,10 @@
 ### Install Replicated containers
 ###
 
-- name: Debug
-  debug:
-    msg: Installing Replicated Containers
+- name: Installing Replicated Containers
+  include: replicated-native/replicated.yml
+  become: yes
+  become_method: sudo
 
 #- name: Install Replicated
 #  become: yes
