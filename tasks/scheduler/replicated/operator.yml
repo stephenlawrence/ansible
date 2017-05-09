@@ -3,11 +3,30 @@
 
 - include: user.yml
 - include: config.yml
+    
+- name: Check if /etc/init.d/replicated-operator exists
+  stat: path=/etc/init.d/replicated-operator
+  register: replicated_operator_upstart_service_status
 
-- name: Ensure replicated-operator is stopped
+- name: Ensure replicated-operator is stopped on upstart
   service:
     name: replicated-operator
     state: stopped
+  when:
+  - replicated_operator_upstart_service_status.stat.exists
+  become: yes
+  become_method: sudo
+
+- name: Check if /etc/systemd/system/replicated.service exists
+  stat: path=/etc/systemd/system/replicated.service
+  register: replicated_operator_systemd_service_status
+
+- name: Ensure replicated-operator is stopped on systemd
+  systemd:
+    name: replicated-operator
+    state: stopped
+  when:
+  - replicated_operator_systemd_service_status.stat.exists
   become: yes
   become_method: sudo
 
@@ -15,9 +34,14 @@
 ### Autodiscover existing settings and re-use envvars like DAEMON_TOKEN when present
 ###
 
+- name: Check if /etc/default/replicated-operator exists
+  stat: path={{ confdir }}/replicated-operator
+  register: replicated_operator_init_file
+
 - name: Discover daemon token
   shell: |
-    . /etc/default/replicated-operator && echo $DAEMON_TOKEN
+    . {{ confdir }}/replicated-operator && echo $DAEMON_TOKEN
+  when: replicated_operator_init_file.stat.exists
   register: existing_daemon_token
 
 - name: Create new daemon token
@@ -25,7 +49,7 @@
     head -c 128 /dev/urandom | tr -dc "a-zA-Z0-9" | fold -w 32 | head -n 1
   register: new_daemon_token
   when:
-  - existing_daemon_token.rc != 0
+  - not replicated_operator_init_file.stat.exists
   - replicated_daemon_token is not defined
 
 - name: Set daemon token
@@ -108,18 +132,34 @@
 
 - name: Create Replicated Operator init file at /etc/init/replicated-operator.conf
   template:
-    src: replicated/upstart/replicated_operator_service.j2
+    src: scheduler/replicated/upstart/replicated_operator_service.j2
     dest: /etc/init/replicated-operator.conf
   when: ansible_service_mgr == "upstart"
   become: yes
   become_method: sudo
 
-- name: Ensure replicated-operator is started
+- name: Create Replicated Operator init file at /etc/systemd/system/replicated.service
+  template:
+    src: scheduler/replicated/systemd/replicated_operator_service.j2
+    dest: /etc/systemd/system/replicated-operator.service
+  when: ansible_service_mgr == "systemd"
+  become: yes
+  become_method: sudo
+
+- name: Ensure replicated-operator is started on upstart
   service:
     name: replicated-operator
     state: started
+  when: ansible_service_mgr == "upstart"
+  become: yes
+  become_method: sudo
+
+- name: Ensure replicated-operator is started on systemd
+  systemd:
+    name: replicated-operator
+    state: started
+  when: ansible_service_mgr == "systemd"
   become: yes
   become_method: sudo
 
 ## TODO: add sysv init scripts
-## TODO: add systemd init scripts

@@ -2,44 +2,44 @@
 ### Automation Setup
 ###
 ### Parameters are:
-###   - automation_replicated_setting
-###   - automation_replicated_conf
-###   - automation_extra_files
+###   - replicated_automation_settings_file
+###   - replicated_automation_conf_file
+###   - replicated_automation_extra_files
 ###
 
 - name: Check if settings file should be copied
-  local_action: stat path='{{automation_replicated_setting}}'
+  local_action: stat path='{{replicated_automation_settings_file}}'
   register: settings
-  when: automation_replicated_setting is defined
+  when: replicated_automation_settings_file is defined
 
 - name: Copy settings file
   copy:
     dest: "/etc/settings.conf"
-    src: '{{automation_replicated_setting}}'
+    src: '{{replicated_automation_settings_file}}'
     owner: root
     group: root
     mode: "ugo=r"
   when:
-  - automation_replicated_setting is defined
+  - replicated_automation_settings_file is defined
   - settings.stat.exists
   no_log: false
   become: yes
   become_method: sudo
 
 - name: Check if replicated conf file should be copied
-  local_action: stat path='{{automation_replicated_conf}}'
+  local_action: stat path='{{replicated_automation_conf_file}}'
   register: conf_file
-  when: automation_replicated_conf is defined
+  when: replicated_automation_conf_file is defined
 
 - name: Copy Replicated config file
   copy:
     dest: "/etc/replicated.conf"
-    src: '{{automation_replicated_conf}}'
+    src: '{{replicated_automation_conf_file}}'
     owner: root
     group: root
     mode: "ugo=r"
   when:
-  - automation_replicated_conf is defined
+  - replicated_automation_conf_file is defined
   - conf_file.stat.exists
   no_log: false
   become: yes
@@ -49,8 +49,8 @@
   copy:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
-  with_items: "{{ automation_extra_files }}"
-  when: automation_extra_files is defined
+  with_items: "{{ replicated_automation_extra_files }}"
+  when: replicated_automation_extra_files is defined
 
 ###
 ### Install Replicated
@@ -100,7 +100,7 @@
 ###
 
 - name: Installing Replicated Containers
-  include: replicated-native/replicated.yml
+  include: scheduler/replicated/replicated.yml
   when: opt_install is not defined or opt_install == "replicated"
 
 ###
@@ -113,6 +113,6 @@
     replicated_daemon_host: '{{ ansible_default_ipv4.address }}'
 
 - name: Installing Replicated-Operator
-  include: replicated-native/operator.yml
+  include: scheduler/replicated/operator.yml
   when: opt_install is not defined or opt_install == "operator" or opt_install == "replicated"
 
