@@ -18,7 +18,7 @@ pre-stop script
 end script
 script
     . {{ confdir }}/replicated
-    exec su -s /bin/sh -c 'exec "\$0" "\$@"' {{ replicated_username }} -- /usr/bin/docker run --name=replicated \
+    exec su -s /bin/sh -c 'exec "$0" "$@"' {{ replicated_username }} -- /usr/bin/docker run --name=replicated \
         -p 9874-9879:9874-9879/tcp \
         -u {{ replicated_user_id }}:{{ docker_group_id }} \
         -v /var/lib/replicated:/var/lib/replicated \
@@ -28,8 +28,8 @@ script
         -v /etc/os-release:/host/etc/os-release:ro \
         {{ replicated_trusted_cert_mount }} \
         -v /var/run/replicated:/var/run/replicated \
-        -e LOCAL_ADDRESS={{ ansible_default_ipv4.address }} \
-        -e RELEASE_CHANNEL={{ release_channel }} \
-        \$REPLICATED_OPTS \
+        -e LOCAL_ADDRESS=${PRIVATE_ADDRESS} \
+        -e RELEASE_CHANNEL=${PRIVATE_ADDRESS} \
+        $REPLICATED_OPTS \
         quay.io/replicated/replicated:current
 end script

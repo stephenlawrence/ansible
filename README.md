@@ -39,9 +39,9 @@ The following variables can be passed to the role:
   # To learn more about Replicated automation see
   # https://www.replicated.com/docs/kb/developer-resources/automate-install
   #
-  automation_replicated_setting: settings.conf   # written to /etc/settings.conf
-  automation_replicated_conf: replicated.conf    # written to /etc/replicated.conf
-  automation_extra_files:                        # extra files needed for automation
+  replicated_automation_settings_file: settings.conf  # written to /etc/settings.conf
+  replicated_automation_conf_file: replicated.conf    # written to /etc/replicated.conf
+  replicated_automation_extra_files:                  # extra files needed for automation
   - { src: '/tmp/cert', dest: '/tmp/http-cert' }
   - { src: '/tmp/key', dest: '/tmp/http-key' }
   - { src: '/tmp/license.rli', dest: '/tmp/license.rli' }
@@ -81,9 +81,9 @@ Automation support files are put into place prior to Replicated installing and o
   hosts: replicated
   vars:
     daemon_token: JSWSOzcOmiaeNdt3Bb1Xm7B7Kakj
-    automation_replicated_setting: /tmp/settings.conf
-    automation_replicated_conf: /tmp/replicated.conf
-    automation_extra_files:
+    replicated_automation_settings_file: /tmp/settings.conf
+    replicated_automation_conf_file: /tmp/replicated.conf
+    replicated_automation_extra_files:
     - { src: '/tmp/key', dest: '/tmp/key' }
     - { src: '/tmp/cert', dest: '/tmp/cert' }
     - { src: '/tmp/license.rli', dest: '/tmp/license.rli' }
