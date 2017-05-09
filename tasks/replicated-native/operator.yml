@@ -1,0 +1,125 @@
+## TODO: add proxy support
+## TODO: add ipv6 support
+
+- include: user.yml
+- include: config.yml
+
+- name: Ensure replicated-operator is stopped
+  service:
+    name: replicated-operator
+    state: stopped
+  become: yes
+  become_method: sudo
+
+###
+### Autodiscover existing settings and re-use envvars like DAEMON_TOKEN when present
+###
+
+- name: Discover daemon token
+  shell: |
+    . /etc/default/replicated-operator && echo $DAEMON_TOKEN
+  register: existing_daemon_token
+
+- name: Create new daemon token
+  shell: |
+    head -c 128 /dev/urandom | tr -dc "a-zA-Z0-9" | fold -w 32 | head -n 1
+  register: new_daemon_token
+  when:
+  - existing_daemon_token.rc != 0
+  - replicated_daemon_token is not defined
+
+- name: Set daemon token
+  set_fact:
+    daemon_token: '{{ existing_daemon_token.stdout | default(new_daemon_token.stdout) }}'
+  when: daemon_token is not defined
+
+###
+### Download the Replicated Operator Image
+###
+
+- name: Download Replicated Operator
+  command: docker pull "quay.io/replicated/replicated-operator:{{ replicated_release_channel }}-{{ replicated_version }}"
+  become: yes
+  become_method: sudo
+
+- name: Tag Replicated
+  command: docker tag "quay.io/replicated/replicated-operator:{{ replicated_release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated-operator:current"
+  become: yes
+  become_method: sudo
+
+###
+### Set startup opts flags for REPLICATED-OPERATOR
+###
+
+- name: Set the AIRGAP flag
+  set_fact:
+    replicated_airgap_envvar: '-e REPLICATED_AIRGAP=true'
+  when:
+  - replicated_airgap is defined
+  - replicated_airgap == True
+
+- name: Default to no AIRGAP
+  set_fact:
+    replicated_airgap_envvar: ''
+  when: replicated_airgap_envvar is not defined
+
+- name: Set the TAGS flag
+  set_fact:
+    replicated_tags_envvar: '-e TAGS="{{ replicated_tags }}"'
+  when: replicated_tags is defined
+
+- name: Default to no TAGS
+  set_fact:
+    replicated_tags_envvar: ''
+  when: replicated_tags_envvar is not defined
+
+- name: Set the PUBLIC_ADDRESS flag
+  set_fact:
+    replicated_public_address_envvar: '-e PUBLIC_ADDRESS="{{ replicated_public_address }}"'
+  when: replicated_public_address is defined
+
+- name: Default to no PUBLIC_ADDRESS
+  set_fact:
+    replicated_public_address_envvar: ''
+  when: replicated_public_address_envvar is not defined
+
+- name: Set the OPERATOR_ID flag
+  set_fact:
+    replicated_operator_id_envvar: '-e OPERATOR_ID="{{ operator_id }}"'
+  when: operator_id is defined
+
+- name: Default to no OPERATOR_ID
+  set_fact:
+    replicated_operator_id_envvar: ''
+  when: replicated_operator_id_envvar is not defined
+
+- name: Set general init flags
+  set_fact:
+    registry_advertise_address_envvar: ''
+    daemon_token_envvar: '-e DAEMON_TOKEN="{{ daemon_token }}"'
+    airgap_envvar: ''
+
+- name: Create Replicated Operator defaults in {{ confdir }}/replicated-operator
+  template:
+    src: operator_conf.j2
+    dest: "{{ confdir }}/replicated-operator"
+  become: yes
+  become_method: sudo
+
+- name: Create Replicated Operator init file at /etc/init/replicated-operator.conf
+  template:
+    src: replicated/upstart/replicated_operator_service.j2
+    dest: /etc/init/replicated-operator.conf
+  when: ansible_service_mgr == "upstart"
+  become: yes
+  become_method: sudo
+
+- name: Ensure replicated-operator is started
+  service:
+    name: replicated-operator
+    state: started
+  become: yes
+  become_method: sudo
+
+## TODO: add sysv init scripts
+## TODO: add systemd init scripts

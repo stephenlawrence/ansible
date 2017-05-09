@@ -1,15 +1,59 @@
-- name: Create Replicated User
-  user:
+###
+### Stop the Replicated and Replicated-UI containers so we can install or upgrade them
+###
+
+## TODO: add proxy support
+## TODO: add ipv6 support
+## TODO: add airgap support
+
+- name: Stop Replicated
+  service:
     name: replicated
-    shell: /bin/bash
-    groups: docker
-    append: true
+    state: stopped
+  become: yes
+  become_method: sudo
+
+- name: Stop Replicated-UI
+  service:
+    name: replicated-ui
+    state: stopped
+  become: yes
+  become_method: sudo
+
+###
+### Autodiscover existing settings and re-use envvars like DAEMON_TOKEN when present
+###
+
+- name: Discover daemon token
+  shell: |
+    . /etc/default/replicated && echo $DAEMON_TOKEN
+  register: existing_daemon_token
+
+- name: Create new daemon token
+  shell: |
+    head -c 128 /dev/urandom | tr -dc "a-zA-Z0-9" | fold -w 32 | head -n 1
+  register: new_daemon_token
+  when: existing_daemon_token.rc != 0 and replicated_daemon_token is not defined
+
+- name: Set daemon token
+  set_fact:
+    daemon_token: '{{ existing_daemon_token.stdout | default(new_daemon_token.stdout) }}'
+  when: daemon_token is not defined
+
+###
+### Create Replicated user and install the global alias 
+###
+
+- include: user.yml
+- include: config.yml
 
 - name: Create Replicated Alias
   template:
     src: ../templates/replicated.alias
     dest: /etc/replicated.alias
     mode: 0644
+  become: yes
+  become_method: sudo
 
 - name: Add replicated alias to global bash.bashrc
   blockinfile:
@@ -20,83 +64,38 @@
       if [ -f /etc/replicated.alias ]; then
           . /etc/replicated.alias
       fi
+  become: yes
+  become_method: sudo
 
-## TODO: add proxy support
-
-## TODO: add ipv6 support
-
-- debug:
-    msg: Installing Replicated {{ replicated_version }}
+###
+### Download Replicated and Replicated-UI images
+###
 
 - name: Download Replicated
-  command: docker pull "quay.io/replicated/replicated:{{ release_channel }}-{{ replicated_version }}"
+  command: docker pull "quay.io/replicated/replicated:{{ replicated_release_channel }}-{{ replicated_version }}"
   become: yes
   become_method: sudo
-  when: not skip_docker_install
 
 - name: Tag Replicated
-  command: docker tag "quay.io/replicated/replicated:{{ release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated:current"
+  command: docker tag "quay.io/replicated/replicated:{{ replicated_release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated:current"
   become: yes
   become_method: sudo
-  when: not skip_docker_install
 
 - name: Download Replicated UI
-  command: docker pull "quay.io/replicated/replicated-ui:{{ release_channel }}-{{ replicated_version }}"
+  command: docker pull "quay.io/replicated/replicated-ui:{{ replicated_release_channel }}-{{ replicated_version }}"
   become: yes
   become_method: sudo
-  when: not skip_docker_install
 
 - name: Tag Replicated UI
-  command: docker tag "quay.io/replicated/replicated-ui:{{ release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated-ui:current"
+  command: docker tag "quay.io/replicated/replicated-ui:{{ replicated_release_channel }}-{{ replicated_version }}" "quay.io/replicated/replicated-ui:current"
   become: yes
   become_method: sudo
-  when: not skip_docker_install
-
-###
-### Discover the replicated user setup or create as needed
-###
-
-- name: Discover replicated user-uid
-  command: "id -u {{ replicated_username }}"
-  register: replicated_uid_cmd
-
-- name: Discover the docker group ID
-  command: "stat -c '%g' /var/run/docker.sock"
-  register: docker_gid_cmd
-
-- name: Fallback to the docker group if needed
-  command: "getent group docker | cut -d: -f3"
-  register: docker_gid_fallback_cmd
-  when: docker_gid_cmd is not defined
-
-- name: Set UID/GID vars
-  set_fact:
-    replicated_user_id: '{{ replicated_uid_cmd.stdout | default("0") }}'
-    docker_group_id: '{{ docker_gid_cmd.stdout | default(docker_gid_fallback_cmd.stdout) | default("0") }}'
-
-###
-### Set the directory where the configuration files will be saved
-### 
-- stat:
-    path: /etc/sysconfig
-  register: sysconfig_dir
-
-- name: Set confdir
-  set_fact:
-    confdir: "/etc/sysconfig"
-  when:
-  - ansible_service_mgr == "systemd"
-  - sysconfig_dir.stat.isDir is defined and sysconfig_dir.stat.isDir
-
-- name: Default confdir
-  set_fact:
-    confdir: "/etc/default"
-  when: confdir is not defined
 
 ##
 ## Discover the CA file and mount it into Replicated and thus allowing updates to the host CA file to be
 ## reflected in the running Replicated (Replicated will need to be restarted after the change)
 ##
+
 - name: Check for /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
   stat:
     path: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
@@ -121,9 +120,6 @@
   stat:
     path: /etc/ssl/certs/ca-certificates.crt
   register: ca5
-
-- debug:
-    msg: CA5 is {{ ca5 }}
 
 - name: Choose /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem if exists
   set_fact: cert_file="/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
@@ -172,40 +168,54 @@
     daemon_token_envvar: '-e DAEMON_TOKEN="{{ daemon_token }}"'
     airgap_envvar: ''
 
-## TODO add notify restart
+###
+### Create the file to store the Replicated settings
+###
+
 - name: Create Replicated defaults in {{ confdir }}/replicated
   template:
     src: replicated_conf.j2
     dest: "{{ confdir }}/replicated"
+  become: yes
+  become_method: sudo
+  
+###
+### Create the init scripts
+###
 
-## TODO add notify restart
 - name: Create Replicated init file at /etc/init/replicated.conf
   template:
     src: replicated/upstart/replicated_service.j2
     dest: /etc/init/replicated.conf
   when: ansible_service_mgr == "upstart"
-  notify: Start replicated service
+  become: yes
+  become_method: sudo
 
-## TODO add notify restart
 - name: Create Replicated UI init file at /etc/init/replicated-ui.conf
   template:
     src: replicated/upstart/replicated_ui_service.j2
     dest: /etc/init/replicated-ui.conf
   when: ansible_service_mgr == "upstart"
-  notify: Start replicated-ui service
+  become: yes
+  become_method: sudo
 
-## TODO: do we need to stop replicated at the start of the install?
-- service:
+###
+### Bind the Replicated and Replicated-UI serviecs back online
+###
+
+- name: Start Replicated
+  service:
     name: replicated
     state: started
+  become: yes
+  become_method: sudo
 
-- service:
+- name: Start Replicated-UI
+  service:
     name: replicated-ui
     state: started
+  become: yes
+  become_method: sudo
 
 ## TODO: add sysv init scripts
 ## TODO: add systemd init scripts
-
-## TODO: install operator
-
-- include: replicated-operator.yml
