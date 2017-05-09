@@ -2,7 +2,6 @@
 ## - set a fact if docker is installed
 ## - if it is print it and skip all the activity in here
 
-- name: Determine docker version
-  set_fact:
-    docker_version: 1.13.1
-
+# - name: Determine docker version
+#   set_fact:
+#     docker_version: 1.13.1
