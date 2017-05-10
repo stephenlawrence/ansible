@@ -1,11 +1,12 @@
 ---
-log_level: info
+replicated_log_level: info
 replicated_script_url: 'https://get.replicated.com/docker'
 replicated_version: 2.7.0
-release_channel: stable
+replicated_release_channel: stable
 replicated_username: replicated
-ui_bind_port: 8800
-skip_docker_install: false
+replicated_ui_bind_port: 8800
+replicated_skip_docker_install: false
+replicated_airgap: false
 pip_download_dest: /tmp
 pip_version:
 python: python

@@ -1,48 +1,45 @@
-- debug:
-    msg: "Install environment {{ ansible_distribution }} {{ ansible_distribution_version }}"
-
-#
-# Automation Setup
-#
-# Parameters are:
-#   - automation_replicated_setting
-#   - automation_replicated_conf
-#   - automation_extra_files
-#
+###
+### Automation Setup
+###
+### Parameters are:
+###   - replicated_automation_settings_file
+###   - replicated_automation_conf_file
+###   - replicated_automation_extra_files
+###
 
 - name: Check if settings file should be copied
-  local_action: stat path='{{automation_replicated_setting}}'
+  local_action: stat path='{{replicated_automation_settings_file}}'
   register: settings
-  when: automation_replicated_setting is defined
+  when: replicated_automation_settings_file is defined
 
 - name: Copy settings file
   copy:
     dest: "/etc/settings.conf"
-    src: '{{automation_replicated_setting}}'
+    src: '{{replicated_automation_settings_file}}'
     owner: root
     group: root
     mode: "ugo=r"
   when:
-  - automation_replicated_setting is defined
+  - replicated_automation_settings_file is defined
   - settings.stat.exists
   no_log: false
   become: yes
   become_method: sudo
 
 - name: Check if replicated conf file should be copied
-  local_action: stat path='{{automation_replicated_conf}}'
+  local_action: stat path='{{replicated_automation_conf_file}}'
   register: conf_file
-  when: automation_replicated_conf is defined
+  when: replicated_automation_conf_file is defined
 
 - name: Copy Replicated config file
   copy:
     dest: "/etc/replicated.conf"
-    src: '{{automation_replicated_conf}}'
+    src: '{{replicated_automation_conf_file}}'
     owner: root
     group: root
     mode: "ugo=r"
   when:
-  - automation_replicated_conf is defined
+  - replicated_automation_conf_file is defined
   - conf_file.stat.exists
   no_log: false
   become: yes
@@ -52,20 +49,19 @@
   copy:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
-  with_items: "{{ automation_extra_files }}"
-  when: automation_extra_files is defined
+  with_items: "{{ replicated_automation_extra_files }}"
+  when: replicated_automation_extra_files is defined
 
-#
-# Install Replicated
-#
-# Parameters are:
-#   - private_address
-#   - public_address
-#   - proxy
-#   - docker_version
-#   - install replicated|operator; replicated is the default
-#   - install_url overwrite the default install url
-#
+###
+### Install Replicated
+###
+### Parameters are:
+###   - private_address
+###   - public_address
+###   - proxy
+###   - docker_version
+###   - install replicated|operator; replicated is the default
+###
 
 - name: Set install parameters
   set_fact:
@@ -84,49 +80,12 @@
     opt_docker_version: ''
   when: opt_docker_version is not defined
 
-## TODO: get the daemon token from the host, only if it doesn't exist recompute it
-- name: Get daemon token
-  shell: |
-    head -c 128 /dev/urandom | tr -dc "a-zA-Z0-9" | fold -w 32 | head -n 1
-  register: daemon_token_cmd
-
-- name: Set daemon token from command
-  set_fact:
-    daemon_token: '{{ daemon_token_cmd.stdout }}'
-  when: daemon_token is not defined
-
-- name: Default daemon token if not passed
-  set_fact:
-    opt_daemon_token: ''
-  when: daemon_token is not defined
-
-- name: Set Replicated install url
-  set_fact:
-    opt_install_url: '{{ install_url | default("https://get.replicated.com/docker") }}'
-  when: opt_install == "replicated"
-
-- name: Set Replicated Operator install url
-  set_fact:
-    opt_install_url: '{{ install_url | default("https://get.replicated.com/operator") }}'
-  when: opt_install == "operator"
-
-- name: Print install settings
-  debug:
-    msg: |
-      Private address: {{ opt_private_address }}
-      Public address: {{ opt_public_address }}
-      Proxy: {{ opt_proxy }}
-      Docker version: {{ opt_docker_version }}
-      Daemon token: {{ daemon_token }}
-
-- name: Debug Variables
-  debug:
-    msg: 'Using install script {{ opt_install_url }}'
-
 ###
 ### Run the docker install for the operating system
 ###
-- stat:
+
+- name: Check if Docker is already installed
+  stat:
     path: /usr/bin/dockerd
   register: docker_installed
 
@@ -138,39 +97,23 @@
   when: docker_installed.stat.exists == False
 
 ###
-### Install Replicated containers
+### Install Replicated
 ###
 
 - name: Installing Replicated Containers
-  include: replicated-native/replicated.yml
-  become: yes
-  become_method: sudo
+  include: scheduler/replicated/replicated.yml
+  when: opt_install is not defined or opt_install == "replicated"
 
-#- name: Install Replicated
-#  become: yes
-#  become_method: sudo
-#  shell: |
-#    cat /tmp/install-script.sh | sudo bash -s bypass-storagedriver-warnings {{ opt_docker_version }} {{ opt_proxy }} \
-#      private-address={{ opt_private_address }} \
-#      public-address={{ opt_public_address }} \
-#      {{ opt_daemon_token }}
-#  args:
-#    executable: /bin/bash
-#  when: opt_install == "replicated"
-#
-#- name: Install Replicated Operator
-#  become: yes
-#  become_method: sudo
-#  shell: |
-#    cat /tmp/install-script.sh | sudo bash -s bypass-storagedriver-warnings {{ opt_docker_version }} {{ opt_proxy }} \
-#      private-address={{ opt_private_address }} \
-#      public-address={{ opt_public_address }} \
-#      {{ opt_daemon_token }} \
-#      {{ opt_daemon_endpoint }}
-#  args:
-#    executable: /bin/bash
-#  when: opt_install == "operator"
+###
+### Install Replicated Operator
+###
 
-#####
-#### End replace section
-#####
+- name: Prep operator install env vars
+  set_fact:
+    replicated_daemon_endpoint: '{{ ansible_default_ipv4.address }}:9879'
+    replicated_daemon_host: '{{ ansible_default_ipv4.address }}'
+
+- name: Installing Replicated-Operator
+  include: scheduler/replicated/operator.yml
+  when: opt_install is not defined or opt_install == "operator" or opt_install == "replicated"
+
