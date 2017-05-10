@@ -62,7 +62,7 @@
 
 - name: Create Replicated Alias
   template:
-    src: ../templates/replicated.alias
+    src: ../templates/replicated_alias.j2
     dest: /etc/replicated.alias
     mode: 0644
   become: yes

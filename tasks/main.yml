@@ -89,11 +89,8 @@
     path: /usr/bin/dockerd
   register: docker_installed
 
-
-
-
 - name: Install Docker
-  include: os/pre/{{ ansible_distribution }}.yml
+  include: docker/pre/{{ ansible_distribution }}.yml
   when: docker_installed.stat.exists == False
 
 ###

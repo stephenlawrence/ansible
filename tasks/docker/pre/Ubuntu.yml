@@ -1,8 +1,4 @@
-- include: docker_common.yml
-
-## TODO
-## - set a fact if docker is installed
-## - if it is print it and skip all the activity in here
+- include: ../docker_common.yml
 
 - name: Set max install version on Ubuntu 15.04
   set_fact:
