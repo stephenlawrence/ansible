@@ -89,11 +89,12 @@
     path: /usr/bin/dockerd
   register: docker_installed
 
+
+
+
 - name: Install Docker
-  include: os/{{ ansible_distribution }}.yml
-  when:
-  - docker_installed is not defined
-  - not replicated_skip_docker_install
+  include: os/pre/{{ ansible_distribution }}.yml
+  when: docker_installed.stat.exists == False
 
 ###
 ### Install Replicated

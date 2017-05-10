@@ -7,3 +7,7 @@ replicated_username: replicated
 replicated_ui_bind_port: 8800
 replicated_skip_docker_install: false
 replicated_airgap: false
+pip_download_dest: /tmp
+pip_version:
+python: python
+pip: pip

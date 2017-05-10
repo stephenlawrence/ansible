@@ -26,6 +26,7 @@ galaxy_info:
    - name: CentOS
      versions:
       - 6+
+      - 7+
    - name: Amazon AMI
      versions:
       - 2014.03
