@@ -1,19 +1,15 @@
 - include: ../docker_common.yml
 
-## TODO
-## - set a fact if docker is installed
-## - if it is print it and skip all the activity in here
-
 - name: Set max install version on CENTOS 6
   set_fact:
-    pinned_docker_version: 1.7.1
+    replicated_docker_version: 1.7.1
   when:
     - ansible_distribution == "CentOS"
     - ansible_distribution_major_version == "6"
 
 - name: Set max install version on CENTOS 7
   set_fact:
-    pinned_docker_version: 1.12.3
+    replicated_docker_version: 1.12.3
   when:
     - ansible_distribution == "CentOS"
     - ansible_distribution_major_version == "7"
@@ -23,9 +19,5 @@
     name: libselinux-python
     state: present
   become: yes
-
-
-- debug:
-    msg: "Running the docker install using docker version {{ pinned_docker_version }} "
 
 - include: ../docker_service.yml

@@ -7,6 +7,10 @@
 ###   - replicated_automation_extra_files
 ###
 
+- name: d1
+  debug:
+    msg: "Private ip is {{ replicated_private_address }}"
+
 - name: Check if settings file should be copied
   local_action: stat path='{{replicated_automation_settings_file}}'
   register: settings
@@ -56,29 +60,12 @@
 ### Install Replicated
 ###
 ### Parameters are:
-###   - private_address
-###   - public_address
-###   - proxy
-###   - docker_version
-###   - install replicated|operator; replicated is the default
+###   - replicated_private_address
+###   - replicated_public_address
+###   - replicated_proxy
+###   - replicated_docker_version
+###   - replicated_install replicated|operator; replicated is the default
 ###
-
-- name: Set install parameters
-  set_fact:
-    opt_private_address: '{{ private_address | default(ansible_default_ipv4.address) }}'
-    opt_public_address: '{{ public_address | default(ansible_default_ipv4.address) }}'
-    opt_proxy: '{{ proxy | default("no-proxy") }}'
-    opt_install: '{{ install | default("replicated") }}'
-
-- name: Set docker version
-  set_fact:
-    opt_docker_version: 'docker-version={{ docker_version }}'
-  when: docker_version is defined
-
-- name: Default docker version if not passed
-  set_fact:
-    opt_docker_version: ''
-  when: opt_docker_version is not defined
 
 ###
 ### Run the docker install for the operating system
@@ -99,7 +86,7 @@
 
 - name: Installing Replicated Containers
   include: scheduler/replicated/replicated.yml
-  when: opt_install is not defined or opt_install == "replicated"
+  when: replicated_install is not defined or replicated_install == "replicated"
 
 ###
 ### Install Replicated Operator
@@ -112,5 +99,5 @@
 
 - name: Installing Replicated-Operator
   include: scheduler/replicated/operator.yml
-  when: opt_install is not defined or opt_install == "operator" or opt_install == "replicated"
+  when: replicated_install is not defined or replicated_install == "operator" or replicated_install == "replicated"
 

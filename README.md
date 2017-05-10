@@ -23,13 +23,12 @@ The following variables can be passed to the role:
   #
   # Replicated or Replicated Operator install
   #
-  private_address: 10.0.7.20         # server private address, if left blank defaults to ansible_default_ipv4.address
-  public_addres: 10.0.7.20           # server public address, if left blank defaults to ansible_default_ipv4.address
-  proxy: http://10.0.7.2:3128        # optional proxy http address
-  docker_version: 1.12.3             # optional docker version
-  replicated_version: 2.7            # optional replicated version
-  install: replicated                # optional what to install, either replicated (the default) or operator
-  install_url: <url>                 # optional install_url script
+  replicated_private_address: 10.0.7.20         # server private address, if left blank defaults to ansible_default_ipv4.address
+  replicated_public_addres: 10.0.7.20           # server public address, if left blank defaults to ansible_default_ipv4.address
+  replicated_proxy: http://10.0.7.2:3128        # optional proxy http address
+  replicated_docker_version: 1.12.3             # optional docker version
+  replicated_version: 2.7                       # optional replicated version
+  replicated_install: replicated                # optional what to install, either replicated (the default) or operator
 
   #
   # Automation support to install both Replicated and your application and
