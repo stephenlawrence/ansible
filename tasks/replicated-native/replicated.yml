@@ -13,7 +13,7 @@
 
 - name: Add replicated alias to global bash.bashrc
   blockinfile:
-    dest: /etc/bash.bashrc
+    dest: /etc/profile
     insertafter: EOF
     state: present
     block: |
@@ -76,7 +76,7 @@
 
 ###
 ### Set the directory where the configuration files will be saved
-### 
+###
 - stat:
     path: /etc/sysconfig
   register: sysconfig_dir
